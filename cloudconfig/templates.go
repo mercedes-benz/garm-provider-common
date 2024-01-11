@@ -355,7 +355,7 @@ function Update-GarmStatus() {
 		}
 
 		if ($AgentID -ne 0) {
-			$body["AgentID"] = $AgentID
+			$body["agent_id"] = $AgentID
 		}
 		Invoke-APICall -Payload $body -CallbackURL $CallbackURL | Out-Null
 	}
