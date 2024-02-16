@@ -206,8 +206,7 @@ sudo ./svc.sh install {{ .RunnerUsername }} || fail "failed to install service"
 {{- end}}
 
 if [ -e "/sys/fs/selinux" ];then
-	sudo chcon -h user_u:object_r:bin_t /home/runner/ || fail "failed to change selinux context"
-	sudo chcon -R -h {{ .RunnerUsername }}:object_r:bin_t /home/runner/* || fail "failed to change selinux context"
+	sudo chcon -R -h user_u:object_r:bin_t:s0 /home/runner/ || fail "failed to change selinux context"
 fi
 
 AGENT_ID=""
