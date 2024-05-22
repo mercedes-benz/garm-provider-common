@@ -21,6 +21,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path"
+	"runtime"
 	"testing"
 
 	runnerErrors "github.com/cloudbase/garm-provider-common/errors"
@@ -137,9 +138,15 @@ func TestGetLoggingWriterValidLogFile(t *testing.T) {
 
 func TestGetLoggingWriterFailedToCreateLogFolder(t *testing.T) {
 	// Add a log file path that includes a directory that does not exist.
-	logFile := "/non-existent-system-dir/test.log"
+	var logFile string
+	if runtime.GOOS == "windows" {
+		logFile = "T:/test.log"
+	} else {
+		logFile = "/non-existent-dir/test.log"
+	}
 
-	_, err := GetLoggingWriter(logFile)
+	writer, err := GetLoggingWriter(logFile)
+	require.Equal(t, nil, writer)
 	require.Error(t, err)
 	require.EqualError(t, err, "failed to create log folder")
 }
@@ -159,7 +166,14 @@ func TestGetLoggingWriterPermisionDenied(t *testing.T) {
 		t.Fatalf("failed to remove execute permission from temporary directory: %s", err)
 	}
 
-	_, err = GetLoggingWriter(path.Join(dir, "non-existing-folder", "test.log"))
+	var dirPath string
+	if runtime.GOOS == "windows" {
+		dirPath = "T:/non-existent-dir"
+	} else {
+		dirPath = "/non-existent-dir/"
+	}
+
+	_, err = GetLoggingWriter(path.Join(dir, dirPath, "test.log"))
 	require.Error(t, err)
 	require.EqualError(t, err, "failed to create log folder")
 }
@@ -181,7 +195,7 @@ func TestConvertFileToBase64(t *testing.T) {
 func TestConvertFileToBase64FileNotFound(t *testing.T) {
 	_, err := ConvertFileToBase64("")
 	require.Error(t, err)
-	require.EqualError(t, err, "reading file: open : no such file or directory")
+	require.ErrorContains(t, err, "reading file")
 }
 
 func TestOSToOSType(t *testing.T) {
