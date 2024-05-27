@@ -393,6 +393,49 @@ function Invoke-GarmFailure() {
 	}
 }
 
+function Set-SystemInfo {
+    [CmdletBinding()]
+    param (
+        [parameter(Mandatory=$true)]
+        [string]$CallbackURL,
+        [parameter(Mandatory=$true)]
+        [string]$RunnerDir,
+		[parameter(Mandatory=$true)]
+        [string]$BearerToken
+    )
+
+    # Construct the path to the .runner file
+    $agentInfoFile = Join-Path $RunnerDir ".runner"
+
+    # Read and parse the JSON content from the .runner file
+    $agentInfo = ConvertFrom-Json (Get-Content -Raw -Path $agentInfoFile)
+    $AgentId = $agentInfo.agent_id
+
+    # Retrieve OS information
+    $osInfo = Get-WmiObject -Class Win32_OperatingSystem
+    $osName = $osInfo.Caption
+    $osVersion = $osInfo.Version
+
+    # Strip status from the callback URL
+    if ($CallbackUrl -match '^(.*)/status(/)?$') {
+        $CallbackUrl = $matches[1]
+    }
+
+    $SysInfoUrl = "$CallbackUrl/system-info/"
+    $Payload = @{
+        os_name    = $OSName
+        os_version = $OSVersion
+        agent_id   = $AgentId
+    } | ConvertTo-Json
+
+    # Send the POST request
+    try {
+        Invoke-RestMethod -Uri $SysInfoUrl -Method Post -Body $Payload -ContentType 'application/json' -Headers @{ 'Authorization' = "Bearer $BearerToken" } -ErrorAction Stop
+    } catch {
+        Write-Output "Failed to send the system information."
+    }
+}
+
 $GHRunnerGroup = "{{.GitHubRunnerGroup}}"
 
 function Install-Runner() {
@@ -458,6 +501,7 @@ function Install-Runner() {
 		$SVC_NAME=(gc -raw $serviceNameFile)
 		New-Service -Name "$SVC_NAME" -BinaryPathName "C:\runner\bin\RunnerService.exe" -DisplayName "$SVC_NAME" -Description "GitHub Actions Runner ($SVC_NAME)" -StartupType Automatic
 		Start-Service "$SVC_NAME"
+		Set-SystemInfo -CallbackURL $CallbackURL -RunnerDir $runnerDir -BearerToken $Token
 		Update-GarmStatus -Message "runner successfully installed" -CallbackURL $CallbackURL -Status "idle" | Out-Null
 
 		{{- else }}
@@ -470,6 +514,7 @@ function Install-Runner() {
 
 		$agentInfoFile = Join-Path $runnerDir ".runner"
 		$agentInfo = ConvertFrom-Json (gc -raw $agentInfoFile)
+		Set-SystemInfo -CallbackURL $CallbackURL -RunnerDir $runnerDir -BearerToken $Token
 		Invoke-GarmSuccess -CallbackURL $CallbackURL -Message "runner successfully installed" -AgentID $agentInfo.agentId
 		{{- end }}
 	} catch {
